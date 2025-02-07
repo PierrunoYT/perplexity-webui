@@ -426,26 +426,35 @@ export default function ChatInterface() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-4xl mx-auto h-[calc(100vh-8rem)]">
+    <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 dark:border-gray-700/50 max-w-4xl mx-auto h-[calc(100vh-10rem)]">
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-4">
-          <input
-            type="password"
-            value={apiKey}
-            onChange={handleApiKeyChange}
-            placeholder="Enter your Perplexity API key"
-            className="flex-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            aria-label="Open settings"
-          >
-            <Cog6ToothIcon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-          </button>
+        {/* API Key Input */}
+        <div className="p-4 border-b border-gray-200/80 dark:border-gray-700/80 backdrop-blur-sm">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={handleApiKeyChange}
+                placeholder="Enter your Perplexity API key"
+                className="w-full p-2.5 pl-10 rounded-lg border border-gray-200 dark:border-gray-600 bg-white/50 dark:bg-gray-700/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200"
+              />
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+              aria-label="Open settings"
+            >
+              <Cog6ToothIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -454,54 +463,66 @@ export default function ChatInterface() {
               }`}
             >
               <div
-                className={`max-w-[80%] rounded-lg p-3 ${
+                className={`max-w-[80%] rounded-2xl p-4 ${
                   message.role === 'user'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 dark:text-white'
+                    ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg'
+                    : 'bg-gray-100/80 dark:bg-gray-700/80 backdrop-blur-sm dark:text-white shadow-md'
                 }`}
               >
                 {renderMessage(message)}
               </div>
             </div>
           ))}
+          {isLoading && (
+            <div className="flex justify-center">
+              <div className="animate-pulse flex space-x-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+              </div>
+            </div>
+          )}
+          
+          {/* Related Questions */}
           {relatedQuestions.length > 0 && (
-            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                Related Questions:
+            <div className="mt-6 p-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-700/50">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                Related Questions
               </h3>
-              <ul className="space-y-2">
+              <div className="flex flex-wrap gap-2">
                 {relatedQuestions.map((question, index) => (
-                  <li key={index}>
-                    <button
-                      onClick={() => {
-                        setInput(question);
-                        setRelatedQuestions([]);
-                      }}
-                      className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm text-left"
-                    >
-                      {question}
-                    </button>
-                  </li>
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setInput(question);
+                      // Optional: Automatically submit the question
+                      // handleSubmit(new Event('submit') as React.FormEvent);
+                    }}
+                    className="text-sm px-3 py-1.5 rounded-lg bg-white/50 dark:bg-gray-700/50 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/50 dark:border-gray-600/50 text-gray-700 dark:text-gray-300 transition-colors duration-200"
+                  >
+                    {question}
+                  </button>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200 dark:border-gray-700">
+        {/* Input Form */}
+        <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200/80 dark:border-gray-700/80">
           <div className="flex gap-2">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask me anything..."
-              className="flex-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+              className="flex-1 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white/50 dark:bg-gray-700/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200 dark:text-white"
               disabled={isLoading || !apiKey}
             />
             <button
               type="submit"
               disabled={isLoading || !apiKey || !input.trim()}
-              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               <PaperAirplaneIcon className="h-5 w-5" />
             </button>
