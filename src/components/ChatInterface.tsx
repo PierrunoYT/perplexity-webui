@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PaperAirplaneIcon, Cog6ToothIcon } from '@heroicons/react/24/solid';
-import { DEFAULT_SETTINGS, type ApiSettings, type ResearchResponse, type ArticleResponse, getStructuredCompletion } from '../services/perplexityApi';
+import { DEFAULT_SETTINGS, type ApiSettings, type ResearchResponse, type ArticleResponse, getStructuredCompletion, PerplexityAPIError, getEnvVar } from '../services/perplexityApi';
 import SettingsPanel from './SettingsPanel';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -16,10 +16,23 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('perplexity_api_key') || '');
+  const [apiKey, setApiKey] = useState('');
   const [settings, setSettings] = useState<ApiSettings>(DEFAULT_SETTINGS);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [relatedQuestions, setRelatedQuestions] = useState<string[]>([]);
+  const [, setError] = useState<string | null>(null);
+
+  // Load API key from environment or localStorage on component mount
+  useEffect(() => {
+    const envApiKey = getEnvVar('VITE_PERPLEXITY_API_KEY');
+    const storedApiKey = localStorage.getItem('perplexity_api_key');
+
+    if (envApiKey) {
+      setApiKey(envApiKey);
+    } else if (storedApiKey) {
+      setApiKey(storedApiKey);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,23 +46,38 @@ export default function ChatInterface() {
 
     try {
       const response = await getStructuredCompletion(input.trim(), apiKey, settings);
-      
+
       const assistantMessage = {
         role: 'assistant' as const,
         content: response.choices[0].message.content,
         citations: response.citations,
         isResearchResponse: true
       };
-      
+
       setMessages(prev => [...prev, assistantMessage]);
       if (response.related_questions) {
         setRelatedQuestions(response.related_questions);
       }
     } catch (error) {
       console.error('Error:', error);
+      let errorMessage = 'Sorry, there was an error processing your request.';
+
+      if (error instanceof PerplexityAPIError) {
+        if (error.status === 401) {
+          errorMessage = 'Invalid API key. Please check your Perplexity API key.';
+        } else if (error.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else if (error.status === 400) {
+          errorMessage = 'Invalid request. Please check your input and try again.';
+        } else {
+          errorMessage = `API Error: ${error.message}`;
+        }
+      }
+
+      setError(errorMessage);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Sorry, there was an error processing your request.'
+        content: errorMessage
       }]);
     } finally {
       setIsLoading(false);
@@ -70,7 +98,7 @@ export default function ChatInterface() {
     if (message.isResearchResponse) {
       try {
         const research: ResearchResponse | ArticleResponse = JSON.parse(message.content);
-        
+
         // Check if it's an article response
         if ('sections' in research) {
           return (
@@ -79,7 +107,7 @@ export default function ChatInterface() {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {research.title}
               </h1>
-              
+
               {/* Sections */}
               <div className="space-y-8">
                 {research.sections.map((section, index) => (
@@ -124,7 +152,7 @@ export default function ChatInterface() {
                         {section.content}
                       </ReactMarkdown>
                     </div>
-                    
+
                     {section.subsections && section.subsections.length > 0 && (
                       <div className="pl-4 space-y-4 mt-4 border-l-2 border-gray-200 dark:border-gray-700">
                         {section.subsections.map((subsection, subIndex) => (
@@ -176,7 +204,7 @@ export default function ChatInterface() {
                   </div>
                 ))}
               </div>
-              
+
               {/* Summary Table */}
               {research.summary_table && (
                 <div className="mt-6">
@@ -184,7 +212,7 @@ export default function ChatInterface() {
                     Zusammenfassung
                   </h3>
                   <div className="prose dark:prose-invert max-w-none overflow-x-auto">
-                    <ReactMarkdown 
+                    <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
                         table: ({ children }) => (
@@ -214,7 +242,7 @@ export default function ChatInterface() {
                   </div>
                 </div>
               )}
-              
+
               {/* Citations */}
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -239,7 +267,7 @@ export default function ChatInterface() {
             </div>
           );
         }
-        
+
         // If not an article, render as research response
         return (
           <div className="space-y-6">
@@ -250,7 +278,7 @@ export default function ChatInterface() {
               </h3>
               <p className="text-blue-800 dark:text-blue-200">{research.summary}</p>
             </div>
-            
+
             {/* Main Content */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left Column */}
@@ -482,7 +510,7 @@ export default function ChatInterface() {
               </div>
             </div>
           )}
-          
+
           {/* Related Questions */}
           {relatedQuestions.length > 0 && (
             <div className="mt-6 p-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-700/50">
@@ -538,4 +566,4 @@ export default function ChatInterface() {
       </div>
     </div>
   );
-} 
+}

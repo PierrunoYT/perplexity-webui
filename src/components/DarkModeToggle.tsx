@@ -4,7 +4,7 @@ import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 export default function DarkModeToggle() {
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.theme === 'dark' || 
+    return localStorage.theme === 'dark' ||
            (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
 
@@ -16,6 +16,21 @@ export default function DarkModeToggle() {
       document.documentElement.classList.remove('dark');
       localStorage.theme = 'light';
     }
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!('theme' in localStorage)) {
+        setIsDark(e.matches);
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+
+    // Cleanup event listener
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
   }, [isDark]);
 
   const toggleDarkMode = () => {
@@ -35,4 +50,4 @@ export default function DarkModeToggle() {
       )}
     </button>
   );
-} 
+}

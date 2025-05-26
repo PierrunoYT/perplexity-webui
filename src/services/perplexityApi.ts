@@ -50,10 +50,19 @@ export interface ApiSettings {
   stream?: boolean;
 }
 
+// Environment variable helpers
+export const getEnvVar = (key: string, defaultValue?: string): string => {
+  const value = import.meta.env[key];
+  if (!value && !defaultValue) {
+    console.warn(`Environment variable ${key} is not set`);
+  }
+  return value || defaultValue || '';
+};
+
 export const DEFAULT_SETTINGS: ApiSettings = {
-  model: 'sonar-medium',
-  temperature: 0.7,
-  top_p: 0.9,
+  model: (getEnvVar('VITE_DEFAULT_MODEL', 'sonar-medium') as ApiSettings['model']),
+  temperature: parseFloat(getEnvVar('VITE_DEFAULT_TEMPERATURE', '0.7')),
+  top_p: parseFloat(getEnvVar('VITE_DEFAULT_TOP_P', '0.9')),
   top_k: 0,
   presence_penalty: 0,
   frequency_penalty: 1,
@@ -85,29 +94,59 @@ export interface ChatCompletionResponse {
   related_questions?: string[];
 }
 
+// Custom error types
+export class PerplexityAPIError extends Error {
+  constructor(
+    message: string,
+    public status?: number,
+    public response?: unknown
+  ) {
+    super(message);
+    this.name = 'PerplexityAPIError';
+  }
+}
+
 export async function getChatCompletion(
-  messages: Message[], 
+  messages: Message[],
   apiKey: string,
   settings: ApiSettings
 ): Promise<ChatCompletionResponse> {
-  const response = await fetch('https://api.perplexity.ai/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      ...settings,
-      messages,
-      stream: false
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
+  if (!apiKey.trim()) {
+    throw new PerplexityAPIError('API key is required');
   }
 
-  return response.json();
+  try {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        ...settings,
+        messages,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new PerplexityAPIError(
+        `API request failed: ${response.statusText}`,
+        response.status,
+        errorData
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof PerplexityAPIError) {
+      throw error;
+    }
+    throw new PerplexityAPIError(
+      `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
 
 export const ARTICLE_SCHEMA = {
@@ -220,4 +259,4 @@ export async function getStructuredCompletion(
   };
 
   return getChatCompletion(messages, apiKey, structuredSettings);
-} 
+}
