@@ -1,6 +1,12 @@
 interface Message {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | Array<{
+    type: 'text' | 'image_url';
+    text?: string;
+    image_url?: {
+      url: string;
+    };
+  }>;
 }
 
 export interface ResearchResponse {
@@ -35,7 +41,7 @@ export interface RegexFormat {
 export type ResponseFormat = JsonSchemaFormat | RegexFormat;
 
 export interface ApiSettings {
-  model: 'sonar' | 'sonar-pro' | 'sonar-reasoning' | 'sonar-reasoning-pro' | 'sonar-medium';
+  model: 'sonar' | 'sonar-pro' | 'sonar-reasoning' | 'sonar-reasoning-pro' | 'sonar-deep-research' | 'r1-1776';
   temperature: number;
   top_p: number;
   top_k: number;
@@ -46,6 +52,12 @@ export interface ApiSettings {
   return_related_questions?: boolean;
   search_domain_filter?: string[];
   search_recency_filter?: 'month' | 'week' | 'day' | 'hour';
+  search_context_size?: 'high' | 'medium' | 'low';
+  date_range_filter?: {
+    start_date?: string; // ISO 8601 format
+    end_date?: string;   // ISO 8601 format
+  };
+  user_location_filter?: string; // Location string for filtering results
   response_format?: ResponseFormat;
   stream?: boolean;
 }
@@ -60,7 +72,7 @@ export const getEnvVar = (key: string, defaultValue?: string): string => {
 };
 
 export const DEFAULT_SETTINGS: ApiSettings = {
-  model: (getEnvVar('VITE_DEFAULT_MODEL', 'sonar-medium') as ApiSettings['model']),
+  model: (getEnvVar('VITE_DEFAULT_MODEL', 'sonar') as ApiSettings['model']),
   temperature: parseFloat(getEnvVar('VITE_DEFAULT_TEMPERATURE', '0.7')),
   top_p: parseFloat(getEnvVar('VITE_DEFAULT_TOP_P', '0.9')),
   top_k: 0,
@@ -68,6 +80,7 @@ export const DEFAULT_SETTINGS: ApiSettings = {
   frequency_penalty: 1,
   return_images: false,
   return_related_questions: false,
+  search_context_size: 'medium',
   stream: false
 };
 

@@ -24,9 +24,9 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
 
   const handleStructuredOutputChange = (type: 'none' | 'json' | 'regex', value?: string) => {
     setOutputType(type);
-    
+
     let responseFormat: ResponseFormat | undefined;
-    
+
     if (type === 'json' && value) {
       try {
         const schema = JSON.parse(value);
@@ -99,10 +99,12 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                             onChange={(e) => handleChange('model', e.target.value as ApiSettings['model'])}
                             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                           >
-                            <option value="sonar">sonar</option>
-                            <option value="sonar-pro">sonar-pro</option>
-                            <option value="sonar-reasoning">sonar-reasoning</option>
-                            <option value="sonar-reasoning-pro">sonar-reasoning-pro</option>
+                            <option value="sonar">sonar (Fast, cost-effective)</option>
+                            <option value="sonar-pro">sonar-pro (Advanced search)</option>
+                            <option value="sonar-reasoning">sonar-reasoning (Quick reasoning)</option>
+                            <option value="sonar-reasoning-pro">sonar-reasoning-pro (Premier reasoning)</option>
+                            <option value="sonar-deep-research">sonar-deep-research (Exhaustive research)</option>
+                            <option value="r1-1776">r1-1776 (Offline chat)</option>
                           </select>
                         </div>
 
@@ -222,6 +224,24 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                            Search Context Size
+                          </label>
+                          <select
+                            value={settings.search_context_size || 'medium'}
+                            onChange={(e) => handleChange('search_context_size', (e.target.value || undefined) as ApiSettings['search_context_size'])}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          >
+                            <option value="low">Low (Cost-efficient)</option>
+                            <option value="medium">Medium (Balanced)</option>
+                            <option value="high">High (Maximum depth)</option>
+                          </select>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Controls search depth and cost. Higher = more thorough but more expensive.
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                             Search Domain Filter (comma-separated)
                           </label>
                           <input
@@ -236,12 +256,59 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                           </p>
                         </div>
 
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                            Date Range Filter
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="date"
+                              value={settings.date_range_filter?.start_date || ''}
+                              onChange={(e) => handleChange('date_range_filter', {
+                                ...settings.date_range_filter,
+                                start_date: e.target.value || undefined
+                              })}
+                              placeholder="Start date"
+                              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            />
+                            <input
+                              type="date"
+                              value={settings.date_range_filter?.end_date || ''}
+                              onChange={(e) => handleChange('date_range_filter', {
+                                ...settings.date_range_filter,
+                                end_date: e.target.value || undefined
+                              })}
+                              placeholder="End date"
+                              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            />
+                          </div>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Filter search results by date range (ISO 8601 format).
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                            User Location Filter
+                          </label>
+                          <input
+                            type="text"
+                            value={settings.user_location_filter || ''}
+                            onChange={(e) => handleChange('user_location_filter', e.target.value || undefined)}
+                            placeholder="e.g. New York, USA"
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          />
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Filter results based on user location for localized content.
+                          </p>
+                        </div>
+
                         {/* Structured Output Section */}
                         <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
                           <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                            Structured Output (Tier-3 Only)
+                            Structured Output (Available to All Users)
                           </h4>
-                          
+
                           <div className="space-y-4">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -253,8 +320,8 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                               >
                                 <option value="none">None</option>
-                                <option value="json">JSON Schema</option>
-                                <option value="regex">Regex (sonar only)</option>
+                                <option value="json">JSON Schema (All models)</option>
+                                <option value="regex">Regex (sonar & sonar-reasoning only)</option>
                               </select>
                             </div>
 
@@ -316,4 +383,4 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
       </Dialog>
     </Transition.Root>
   );
-} 
+}

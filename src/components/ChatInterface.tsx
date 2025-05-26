@@ -7,7 +7,13 @@ import remarkGfm from 'remark-gfm';
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | Array<{
+    type: 'text' | 'image_url';
+    text?: string;
+    image_url?: {
+      url: string;
+    };
+  }>;
   isResearchResponse?: boolean;
   citations?: string[];
 }
@@ -92,12 +98,38 @@ export default function ChatInterface() {
 
   const renderMessage = (message: Message) => {
     if (message.role === 'user') {
-      return message.content;
+      // Handle both string and array content types
+      if (typeof message.content === 'string') {
+        return message.content;
+      } else {
+        // Handle multimodal content (text + images)
+        return (
+          <div className="space-y-2">
+            {message.content.map((item, index) => {
+              if (item.type === 'text') {
+                return <div key={index}>{item.text}</div>;
+              } else if (item.type === 'image_url') {
+                return (
+                  <img
+                    key={index}
+                    src={item.image_url?.url}
+                    alt="User uploaded image"
+                    className="max-w-full h-auto rounded-lg"
+                  />
+                );
+              }
+              return null;
+            })}
+          </div>
+        );
+      }
     }
 
     if (message.isResearchResponse) {
       try {
-        const research: ResearchResponse | ArticleResponse = JSON.parse(message.content);
+        // For research responses, content should always be a string
+        const contentString = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+        const research: ResearchResponse | ArticleResponse = JSON.parse(contentString);
 
         // Check if it's an article response
         if ('sections' in research) {
@@ -383,10 +415,11 @@ export default function ChatInterface() {
         );
       } catch (error) {
         // If JSON parsing fails, render as markdown
+        const contentString = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
         return (
           <div className="prose dark:prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
+              {contentString}
             </ReactMarkdown>
           </div>
         );
@@ -394,6 +427,7 @@ export default function ChatInterface() {
     }
 
     // For regular messages, render with markdown and clickable citations
+    const contentString = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
     return (
       <div className="space-y-4">
         <div className="prose dark:prose-invert max-w-none">
@@ -430,7 +464,7 @@ export default function ChatInterface() {
               }
             }}
           >
-            {message.content}
+            {contentString}
           </ReactMarkdown>
         </div>
         {message.citations && message.citations.length > 0 && (
