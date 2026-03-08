@@ -27,21 +27,29 @@ export interface ResearchResponse {
 export interface JsonSchemaFormat {
   type: 'json_schema';
   json_schema: {
+    name: string;
     schema: object;
   };
 }
 
-export interface RegexFormat {
-  type: 'regex';
-  regex: {
-    regex: string;
-  };
+export type ResponseFormat = JsonSchemaFormat;
+
+type SearchRecencyFilter = 'year' | 'month' | 'week' | 'day' | 'hour';
+type SearchContextSize = 'high' | 'medium' | 'low';
+
+export interface WebSearchOptions {
+  return_images?: boolean;
+  return_related_questions?: boolean;
+  search_domain_filter?: string[];
+  search_recency_filter?: SearchRecencyFilter;
+  search_context_size?: SearchContextSize;
+  search_after_date_filter?: string;
+  search_before_date_filter?: string;
+  search_type?: 'fast' | 'pro' | 'auto';
 }
 
-export type ResponseFormat = JsonSchemaFormat | RegexFormat;
-
 export interface ApiSettings {
-  model: 'sonar' | 'sonar-pro' | 'sonar-reasoning' | 'sonar-reasoning-pro' | 'sonar-deep-research' | 'r1-1776';
+  model: 'sonar' | 'sonar-pro' | 'sonar-reasoning-pro' | 'sonar-deep-research';
   temperature: number;
   top_p: number;
   top_k: number;
@@ -50,16 +58,17 @@ export interface ApiSettings {
   max_tokens?: number;
   return_images?: boolean;
   return_related_questions?: boolean;
+  web_search_options?: WebSearchOptions;
   search_domain_filter?: string[];
-  search_recency_filter?: 'month' | 'week' | 'day' | 'hour';
-  search_context_size?: 'high' | 'medium' | 'low';
+  search_recency_filter?: SearchRecencyFilter;
+  search_context_size?: SearchContextSize;
   date_range_filter?: {
     start_date?: string; // ISO 8601 format
     end_date?: string;   // ISO 8601 format
   };
-  user_location_filter?: string; // Location string for filtering results
   response_format?: ResponseFormat;
   stream?: boolean;
+  search_type?: 'fast' | 'pro' | 'auto';
 }
 
 // Environment variable helpers
@@ -80,7 +89,7 @@ export const DEFAULT_SETTINGS: ApiSettings = {
   frequency_penalty: 1,
   return_images: false,
   return_related_questions: false,
-  search_context_size: 'medium',
+  search_context_size: 'low',
   stream: false
 };
 
@@ -107,6 +116,97 @@ export interface ChatCompletionResponse {
   related_questions?: string[];
 }
 
+interface ResponseAnnotation {
+  type: string;
+  url?: string;
+}
+
+interface ResponseContentItem {
+  type: string;
+  text?: string;
+  annotations?: ResponseAnnotation[];
+}
+
+interface ResponseOutputItem {
+  type: string;
+  role?: 'assistant' | 'system' | 'user';
+  content?: ResponseContentItem[];
+}
+
+interface PerplexityResponse {
+  id: string;
+  model: string;
+  object: string;
+  created_at: number;
+  status: string;
+  output?: ResponseOutputItem[];
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
+  citations?: string[];
+  related_questions?: string[];
+}
+
+function mapResponseToChatCompletion(response: PerplexityResponse): ChatCompletionResponse {
+  const contentChunks: string[] = [];
+  const citations: string[] = [];
+
+  for (const item of response.output || []) {
+    if (item.type !== 'message' || item.role !== 'assistant' || !item.content) {
+      continue;
+    }
+
+    for (const contentItem of item.content) {
+      if (contentItem.text) {
+        contentChunks.push(contentItem.text);
+      }
+      if (contentItem.annotations) {
+        for (const annotation of contentItem.annotations) {
+          if (annotation.type === 'citation' && annotation.url) {
+            citations.push(annotation.url);
+          }
+        }
+      }
+    }
+  }
+
+  const assistantText = contentChunks.join('\n');
+  const hasResponseCitations = response.citations && response.citations.length > 0;
+  if (!assistantText && !hasResponseCitations) {
+    throw new PerplexityAPIError('Empty response from Perplexity API');
+  }
+
+  return {
+    id: response.id,
+    model: response.model,
+    object: response.object || 'response',
+    created: response.created_at,
+    citations: response.citations || citations,
+    choices: [
+      {
+        index: 0,
+        finish_reason: response.status || 'stop',
+        message: {
+          role: 'assistant',
+          content: assistantText
+        },
+        delta: {
+          role: 'assistant',
+          content: assistantText
+        }
+      }
+    ],
+    usage: {
+      prompt_tokens: response.usage?.input_tokens || 0,
+      completion_tokens: response.usage?.output_tokens || 0,
+      total_tokens: response.usage?.total_tokens || 0
+    },
+    related_questions: response.related_questions
+  };
+}
+
 // Custom error types
 export class PerplexityAPIError extends Error {
   constructor(
@@ -129,17 +229,51 @@ export async function getChatCompletion(
   }
 
   try {
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    const webSearchOptions: WebSearchOptions = {
+      ...settings.web_search_options,
+      return_images: settings.return_images,
+      return_related_questions: settings.return_related_questions,
+      search_domain_filter: settings.search_domain_filter,
+      search_recency_filter: settings.search_recency_filter,
+      search_context_size: settings.search_context_size || settings.web_search_options?.search_context_size,
+      search_type: settings.search_type || settings.web_search_options?.search_type
+    };
+
+    if (settings.date_range_filter?.start_date) {
+      webSearchOptions.search_after_date_filter = settings.date_range_filter.start_date;
+    }
+    if (settings.date_range_filter?.end_date) {
+      webSearchOptions.search_before_date_filter = settings.date_range_filter.end_date;
+    }
+
+    const sanitizedWebSearchOptions = Object.fromEntries(
+      Object.entries(webSearchOptions).filter(([, value]) => value !== undefined)
+    ) as WebSearchOptions;
+
+    const requestBody: Record<string, unknown> = {
+      model: settings.model,
+      input: messages,
+      temperature: settings.temperature,
+      top_p: settings.top_p,
+      max_output_tokens: settings.max_tokens,
+      stream: settings.stream ?? false,
+      web_search_options: Object.keys(sanitizedWebSearchOptions).length
+        ? sanitizedWebSearchOptions
+        : undefined,
+      response_format: settings.response_format
+    };
+
+    if (!requestBody.max_output_tokens) {
+      delete requestBody.max_output_tokens;
+    }
+
+    const response = await fetch('https://api.perplexity.ai/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        ...settings,
-        messages,
-        stream: false
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -151,7 +285,8 @@ export async function getChatCompletion(
       );
     }
 
-    return response.json();
+    const data = await response.json();
+    return mapResponseToChatCompletion(data);
   } catch (error) {
     if (error instanceof PerplexityAPIError) {
       throw error;
@@ -266,6 +401,7 @@ export async function getStructuredCompletion(
     response_format: {
       type: 'json_schema',
       json_schema: {
+        name: 'article_schema',
         schema: ARTICLE_SCHEMA
       }
     }

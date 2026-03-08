@@ -12,8 +12,7 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }: SettingsPanelProps) {
   const [jsonSchema, setJsonSchema] = useState('');
-  const [regex, setRegex] = useState('');
-  const [outputType, setOutputType] = useState<'none' | 'json' | 'regex'>('none');
+  const [outputType, setOutputType] = useState<'none' | 'json'>('none');
 
   const handleChange = (key: keyof ApiSettings, value: ApiSettings[keyof ApiSettings]) => {
     onSettingsChange({
@@ -22,7 +21,7 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
     });
   };
 
-  const handleStructuredOutputChange = (type: 'none' | 'json' | 'regex', value?: string) => {
+  const handleStructuredOutputChange = (type: 'none' | 'json', value?: string) => {
     setOutputType(type);
 
     let responseFormat: ResponseFormat | undefined;
@@ -33,6 +32,7 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
         responseFormat = {
           type: 'json_schema',
           json_schema: {
+            name: 'custom_schema',
             schema
           }
         };
@@ -40,13 +40,6 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
         console.error('Invalid JSON schema:', error);
         return;
       }
-    } else if (type === 'regex' && value) {
-      responseFormat = {
-        type: 'regex',
-        regex: {
-          regex: value
-        }
-      };
     }
 
     onSettingsChange({
@@ -101,10 +94,8 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                           >
                             <option value="sonar">sonar (Fast, cost-effective)</option>
                             <option value="sonar-pro">sonar-pro (Advanced search)</option>
-                            <option value="sonar-reasoning">sonar-reasoning (Quick reasoning)</option>
                             <option value="sonar-reasoning-pro">sonar-reasoning-pro (Premier reasoning)</option>
                             <option value="sonar-deep-research">sonar-deep-research (Exhaustive research)</option>
-                            <option value="r1-1776">r1-1776 (Offline chat)</option>
                           </select>
                         </div>
 
@@ -139,13 +130,11 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                            Max Tokens
-                          </label>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Max Tokens</label>
                           <input
                             type="number"
                             value={settings.max_tokens || ''}
-                            onChange={(e) => handleChange('max_tokens', e.target.value ? parseInt(e.target.value) : 0)}
+                            onChange={(e) => handleChange('max_tokens', e.target.value ? parseInt(e.target.value) : undefined)}
                             placeholder="Optional"
                             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                           />
@@ -227,7 +216,7 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                             Search Context Size
                           </label>
                           <select
-                            value={settings.search_context_size || 'medium'}
+                            value={settings.search_context_size || 'low'}
                             onChange={(e) => handleChange('search_context_size', (e.target.value || undefined) as ApiSettings['search_context_size'])}
                             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                           >
@@ -254,6 +243,21 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             Add - prefix to exclude domains. Max 3 domains.
                           </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                            Search Type
+                          </label>
+                          <select
+                            value={settings.search_type || 'auto'}
+                            onChange={(e) => handleChange('search_type', (e.target.value || undefined) as ApiSettings['search_type'])}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          >
+                            <option value="auto">Auto</option>
+                            <option value="fast">Fast</option>
+                            <option value="pro">Pro</option>
+                          </select>
                         </div>
 
                         <div>
@@ -287,22 +291,6 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                           </p>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                            User Location Filter
-                          </label>
-                          <input
-                            type="text"
-                            value={settings.user_location_filter || ''}
-                            onChange={(e) => handleChange('user_location_filter', e.target.value || undefined)}
-                            placeholder="e.g. New York, USA"
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          />
-                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Filter results based on user location for localized content.
-                          </p>
-                        </div>
-
                         {/* Structured Output Section */}
                         <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
                           <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -316,12 +304,11 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                               </label>
                               <select
                                 value={outputType}
-                                onChange={(e) => handleStructuredOutputChange(e.target.value as 'none' | 'json' | 'regex')}
+                                onChange={(e) => handleStructuredOutputChange(e.target.value as 'none' | 'json')}
                                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                               >
                                 <option value="none">None</option>
                                 <option value="json">JSON Schema (All models)</option>
-                                <option value="regex">Regex (sonar & sonar-reasoning only)</option>
                               </select>
                             </div>
 
@@ -348,28 +335,6 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                               </div>
                             )}
 
-                            {outputType === 'regex' && (
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                                  Regex Pattern
-                                </label>
-                                <div className="mt-1">
-                                  <input
-                                    type="text"
-                                    value={regex}
-                                    onChange={(e) => {
-                                      setRegex(e.target.value);
-                                      handleStructuredOutputChange('regex', e.target.value);
-                                    }}
-                                    className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    placeholder="Enter regex pattern..."
-                                  />
-                                </div>
-                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                  Supports basic patterns, quantifiers, groups, and lookaheads.
-                                </p>
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>

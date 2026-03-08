@@ -28,6 +28,9 @@ npm install
 2. Create a `.env` file in the root directory:
 ```env
 VITE_PERPLEXITY_API_KEY=your_api_key_here
+VITE_DEFAULT_MODEL=sonar
+VITE_DEFAULT_TEMPERATURE=0.7
+VITE_DEFAULT_TOP_P=0.9
 ```
 
 3. Start the development server:
@@ -49,7 +52,12 @@ cd perplexity-webui
 npm install
 
 # Create .env file
-echo "VITE_PERPLEXITY_API_KEY=your_api_key_here" > .env
+cat > .env << 'EOF'
+VITE_PERPLEXITY_API_KEY=your_api_key_here
+VITE_DEFAULT_MODEL=sonar
+VITE_DEFAULT_TEMPERATURE=0.7
+VITE_DEFAULT_TOP_P=0.9
+EOF
 
 # Start development server
 npm run dev
@@ -76,6 +84,30 @@ npm run preview
 - 🔍 Related questions suggestions
 - 📝 Markdown rendering with citation support
 - 🌐 Cross-platform compatibility
+
+## Perplexity API Details
+
+This project uses the Perplexity **Responses API**:
+- Endpoint: `POST https://api.perplexity.ai/v1/responses`
+- Chat input shape: `input` (messages array)
+- Search parameters are sent via `web_search_options`
+- Structured output uses `response_format` with `json_schema`
+
+### Supported models
+
+- `sonar`
+- `sonar-pro`
+- `sonar-reasoning-pro`
+- `sonar-deep-research`
+
+### Default behavior
+
+- Default model: `sonar`
+- Default search context: `low`
+- Structured output defaults:
+  - off by default
+  - JSON schema output is optional and can be enabled in settings
+- Citations are rendered from response annotations when available
 
 ## Development
 
