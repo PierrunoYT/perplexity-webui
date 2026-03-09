@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PaperAirplaneIcon, Cog6ToothIcon } from '@heroicons/react/24/solid';
-import { DEFAULT_SETTINGS, type ApiSettings, type ResearchResponse, type ArticleResponse, getStructuredCompletion, PerplexityAPIError, getEnvVar } from '../services/perplexityApi';
+import { DEFAULT_SETTINGS, type ApiSettings, type ArticleResponse, getStructuredCompletion, PerplexityAPIError, getEnvVar } from '../services/perplexityApi';
 import SettingsPanel from './SettingsPanel';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -126,162 +126,102 @@ export default function ChatInterface() {
     }
 
     if (message.isResearchResponse) {
+      const contentString = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
       try {
-        // For research responses, content should always be a string
-        const contentString = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
-        const research: ResearchResponse | ArticleResponse = JSON.parse(contentString);
+        const article: ArticleResponse = JSON.parse(contentString);
 
-        // Check if it's an article response
-        if ('sections' in research) {
-          return (
-            <div className="space-y-6">
-              {/* Title */}
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {research.title}
-              </h1>
+        const resolveCitationLinks = (text: string): string =>
+          text.replace(/\[(\d+)\]/g, (match, num) => {
+            const citation = article.citations.find(c => c.number === parseInt(num, 10));
+            return citation ? `[${match}](${citation.url})` : match;
+          });
 
-              {/* Sections */}
-              <div className="space-y-8">
-                {research.sections.map((section, index) => (
-                  <div key={index} className="space-y-4">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      {section.heading}
-                    </h2>
-                    <div className="prose dark:prose-invert max-w-none">
-                      <ReactMarkdown
-                        components={{
-                          p: ({ children }) => {
-                            const content = children?.toString() || '';
-                            const parts = content.split(/(\[\d+\])/g);
-                            return (
-                              <p className="text-gray-700 dark:text-gray-300">
-                                {parts.map((part, i) => {
-                                  const citationMatch = part.match(/\[(\d+)\]/);
-                                  if (citationMatch) {
-                                    const citationNumber = parseInt(citationMatch[1]);
-                                    const citation = research.citations.find(c => c.number === citationNumber);
-                                    if (citation) {
-                                      return (
-                                        <a
-                                          key={i}
-                                          href={citation.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-blue-600 dark:text-blue-400 hover:underline"
-                                        >
-                                          {part}
-                                        </a>
-                                      );
-                                    }
-                                  }
-                                  return part;
-                                })}
-                              </p>
-                            );
-                          }
-                        }}
-                      >
-                        {section.content}
-                      </ReactMarkdown>
-                    </div>
+        return (
+          <div className="space-y-6">
+            {/* Title */}
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              {article.title}
+            </h1>
 
-                    {section.subsections && section.subsections.length > 0 && (
-                      <div className="pl-4 space-y-4 mt-4 border-l-2 border-gray-200 dark:border-gray-700">
-                        {section.subsections.map((subsection, subIndex) => (
-                          <div key={subIndex}>
-                            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                              {subsection.heading}
-                            </h3>
-                            <div className="prose dark:prose-invert max-w-none mt-2">
-                              <ReactMarkdown
-                                components={{
-                                  p: ({ children }) => {
-                                    const content = children?.toString() || '';
-                                    const parts = content.split(/(\[\d+\])/g);
-                                    return (
-                                      <p className="text-gray-700 dark:text-gray-300">
-                                        {parts.map((part, i) => {
-                                          const citationMatch = part.match(/\[(\d+)\]/);
-                                          if (citationMatch) {
-                                            const citationNumber = parseInt(citationMatch[1]);
-                                            const citation = research.citations.find(c => c.number === citationNumber);
-                                            if (citation) {
-                                              return (
-                                                <a
-                                                  key={i}
-                                                  href={citation.url}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="text-blue-600 dark:text-blue-400 hover:underline"
-                                                >
-                                                  {part}
-                                                </a>
-                                              );
-                                            }
-                                          }
-                                          return part;
-                                        })}
-                                      </p>
-                                    );
-                                  }
-                                }}
-                              >
-                                {subsection.content}
-                              </ReactMarkdown>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Summary Table */}
-              {research.summary_table && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Zusammenfassung
-                  </h3>
-                  <div className="prose dark:prose-invert max-w-none overflow-x-auto">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        table: ({ children }) => (
-                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            {children}
-                          </table>
-                        ),
-                        thead: ({ children }) => (
-                          <thead className="bg-gray-50 dark:bg-gray-800">
-                            {children}
-                          </thead>
-                        ),
-                        th: ({ children }) => (
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">
-                            {children}
-                          </th>
-                        ),
-                        td: ({ children }) => (
-                          <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-700">
-                            {children}
-                          </td>
-                        )
-                      }}
-                    >
-                      {research.summary_table}
+            {/* Sections */}
+            <div className="space-y-8">
+              {article.sections.map((section, index) => (
+                <div key={index} className="space-y-4">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {section.heading}
+                  </h2>
+                  <div className="prose dark:prose-invert max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {resolveCitationLinks(section.content)}
                     </ReactMarkdown>
                   </div>
-                </div>
-              )}
 
-              {/* Citations */}
+                  {section.subsections && section.subsections.length > 0 && (
+                    <div className="pl-4 space-y-4 mt-4 border-l-2 border-gray-200 dark:border-gray-700">
+                      {section.subsections.map((subsection, subIndex) => (
+                        <div key={subIndex}>
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                            {subsection.heading}
+                          </h3>
+                          <div className="prose dark:prose-invert max-w-none mt-2">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {resolveCitationLinks(subsection.content)}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Summary Table */}
+            {article.summary_table && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Summary
+                </h3>
+                <div className="prose dark:prose-invert max-w-none overflow-x-auto">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      table: ({ children }) => (
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          {children}
+                        </table>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-gray-50 dark:bg-gray-800">
+                          {children}
+                        </thead>
+                      ),
+                      th: ({ children }) => (
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-700">
+                          {children}
+                        </td>
+                      )
+                    }}
+                  >
+                    {article.summary_table}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {/* Citations */}
+            {article.citations.length > 0 && (
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Citations
                 </h3>
                 <ul className="space-y-2">
-                  {research.citations.map((citation, index) => (
+                  {article.citations.map((citation, index) => (
                     <li key={index} className="text-sm">
                       <span className="text-gray-600 dark:text-gray-400">[{citation.number}]</span>{' '}
                       <a
@@ -296,126 +236,11 @@ export default function ChatInterface() {
                   ))}
                 </ul>
               </div>
-            </div>
-          );
-        }
-
-        // If not an article, render as research response
-        return (
-          <div className="space-y-6">
-            {/* Summary Section */}
-            <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                Summary
-              </h3>
-              <p className="text-blue-800 dark:text-blue-200">{research.summary}</p>
-            </div>
-
-            {/* Main Content */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left Column */}
-              <div className="space-y-6">
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Analysis
-                  </h3>
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                    {research.analysis}
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Key Findings
-                  </h3>
-                  <ul className="space-y-4">
-                    {research.findings.map((finding, index) => (
-                      <li key={index} className="pb-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                        <p className="font-medium text-gray-900 dark:text-white mb-1">
-                          {index + 1}. {finding.point}
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          {finding.evidence}
-                        </p>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 pl-4 border-l-2 border-gray-200 dark:border-gray-600">
-                          Citations: {finding.citations.join(', ')}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-6">
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Methodology
-                  </h3>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {research.methodology}
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Limitations
-                  </h3>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {research.limitations}
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Next Steps
-                  </h3>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {research.nextSteps}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Citations and Sources */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              {research.citations && research.citations.length > 0 && (
-                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Citations
-                  </h3>
-                  <ul className="list-decimal list-inside space-y-2 text-sm">
-                    {research.citations.map((citation, index) => (
-                      <li key={index} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-                        <a href={citation} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
-                          {citation}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                  Sources
-                </h3>
-                <ul className="list-decimal list-inside space-y-2 text-sm">
-                  {research.sources.map((source, index) => (
-                    <li key={index} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-                      <a href={source} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
-                        {source}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            )}
           </div>
         );
-      } catch (error) {
-        // If JSON parsing fails, render as markdown
-        const contentString = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+      } catch {
+        // If JSON parsing fails, fall back to markdown
         return (
           <div className="prose dark:prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -426,54 +251,29 @@ export default function ChatInterface() {
       }
     }
 
-    // For regular messages, render with markdown and clickable citations
+    // For regular assistant messages, render with markdown and clickable citations
     const contentString = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+    const citationsForMessage = message.citations ?? [];
+
+    const withResolvedCitations = contentString.replace(/\[(\d+)\]/g, (match, num) => {
+      const citation = citationsForMessage[parseInt(num, 10) - 1];
+      return citation ? `[${match}](${citation})` : match;
+    });
+
     return (
       <div className="space-y-4">
         <div className="prose dark:prose-invert max-w-none">
-          <ReactMarkdown
-            components={{
-              p: ({ children }) => {
-                const content = children?.toString() || '';
-                const parts = content.split(/(\[\d+\])/g);
-                return (
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {parts.map((part, i) => {
-                      const citationMatch = part.match(/\[(\d+)\]/);
-                      if (citationMatch && message.citations) {
-                        const citationIndex = parseInt(citationMatch[1]) - 1;
-                        const citation = message.citations[citationIndex];
-                        if (citation) {
-                          return (
-                            <a
-                              key={i}
-                              href={citation}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 dark:text-blue-400 hover:underline"
-                            >
-                              {part}
-                            </a>
-                          );
-                        }
-                      }
-                      return part;
-                    })}
-                  </p>
-                );
-              }
-            }}
-          >
-            {contentString}
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {withResolvedCitations}
           </ReactMarkdown>
         </div>
-        {message.citations && message.citations.length > 0 && (
+        {citationsForMessage.length > 0 && (
           <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg mt-3">
             <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
               Citations
             </h3>
             <ul className="list-decimal list-inside space-y-1 text-sm">
-              {message.citations.map((citation, index) => (
+              {citationsForMessage.map((citation, index) => (
                 <li key={index} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
                   <a href={citation} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
                     {citation}

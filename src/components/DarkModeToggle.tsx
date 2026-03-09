@@ -16,22 +16,20 @@ export default function DarkModeToggle() {
       document.documentElement.classList.remove('dark');
       localStorage.theme = 'light';
     }
+  }, [isDark]);
 
-    // Listen for system theme changes
+  useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       if (!('theme' in localStorage)) {
         setIsDark(e.matches);
       }
     };
-
     mediaQuery.addEventListener('change', handleChange);
-
-    // Cleanup event listener
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
-  }, [isDark]);
+  }, []);
 
   const toggleDarkMode = () => {
     setIsDark(!isDark);

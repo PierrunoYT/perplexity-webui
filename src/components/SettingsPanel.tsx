@@ -10,9 +10,17 @@ interface SettingsPanelProps {
   onSettingsChange: (settings: ApiSettings) => void;
 }
 
+
 export default function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }: SettingsPanelProps) {
-  const [jsonSchema, setJsonSchema] = useState('');
-  const [outputType, setOutputType] = useState<'none' | 'json'>('none');
+  const [jsonSchema, setJsonSchema] = useState(() => {
+    if (settings.response_format?.type === 'json_schema') {
+      return JSON.stringify(settings.response_format.json_schema.schema, null, 2);
+    }
+    return '';
+  });
+  const [outputType, setOutputType] = useState<'none' | 'json'>(() =>
+    settings.response_format?.type === 'json_schema' ? 'json' : 'none'
+  );
 
   const handleChange = (key: keyof ApiSettings, value: ApiSettings[keyof ApiSettings]) => {
     onSettingsChange({
@@ -134,7 +142,7 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSettingsCha
                           <input
                             type="number"
                             value={settings.max_tokens || ''}
-                            onChange={(e) => handleChange('max_tokens', e.target.value ? parseInt(e.target.value) : undefined)}
+                            onChange={(e) => handleChange('max_tokens', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                             placeholder="Optional"
                             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                           />
